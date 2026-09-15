@@ -44,11 +44,6 @@ input[type=number]{width:70px;text-align:center}
 .choice .t{font-size:14px;line-height:1.35}
 .choice .t b{color:var(--blue);font-weight:600}
 .choice .icons{font-size:14px;margin-top:2px}
-.slot{padding:6px 0;border-bottom:1px solid var(--line)}.slot:last-of-type{border-bottom:0}
-.slotk{font-size:12px;color:var(--muted);margin-bottom:3px}
-.slot select{max-width:100%;width:100%}
-.slotv{font-size:13px;margin-top:4px;color:var(--ink)}
-.btn.small{padding:5px 10px;font-size:13px}
 .warn{color:var(--brick);font-size:13px;font-weight:600;margin:4px 0 0 54px}
 .tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch}
 .tabs button{flex:none;border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 12px;font:inherit;font-size:14px;color:var(--ink)}
@@ -100,7 +95,7 @@ input[type=number]{width:70px;text-align:center}
     <div class="row"><label>Entrée avant les repas</label><select id="entree"><option value="47">Bouillon de légumes (47)</option><option value="40">Potage aux légumes verts (40)</option><option value="39">Soupe aux légumes (39)</option><option value="46">Soupe aux tomates (46)</option><option value="JUSLEG">Jus de légumes ou de tomate</option></select></div>
     <div class="row"><label>Vinaigrette</label><select id="vin"><option value="50">Vinaigrette (base) 50</option><option value="51">À l'ail 51</option><option value="52">Au yogourt 52</option><option value="53">Soleil 53</option></select></div>
   </div>
-  <p class="note">Pour chaque date, choisis un repas du midi et un repas du soir parmi les 21 menus du programme (n'importe quel jour, n'importe quel choix). Le petit déjeuner et l'entrée sont les mêmes tous les jours.</p>
+  <p class="note">Choisir 2 des 3 repas chaque jour. Le petit déjeuner et l'entrée sont les mêmes tous les jours.</p>
   <div id="grid"></div>
 </section>
 
@@ -138,16 +133,13 @@ const RAYONS=["1-Fruits & légumes","2-Viandes & poissons","3-Produits laitiers 
 const DAYS=["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
 const KEY="belleligne.v1";
 function nextMonday(){const d=new Date();d.setHours(12,0,0,0);const dow=d.getDay();d.setDate(d.getDate()-((dow+6)%7));return d.toISOString().slice(0,10)}
-let S=JSON.parse(localStorage.getItem(KEY)||"null")||{start:nextMonday(),pers:2,dej:"PAIN",entree:"47",vin:"50",sel:{1:["1-1","1-3"],2:["2-1","2-3"],3:["3-1","3-3"],4:["4-1","4-3"],5:["5-1","5-3"],6:["6-1","6-3"],7:["7-1","7-3"]},chk:{},tab:"semaine",day:1};
-for(const d in S.sel)S.sel[d]=S.sel[d].map(x=>typeof x==="number"?`${d}-${x}`:x); // migration
+let S=JSON.parse(localStorage.getItem(KEY)||"null")||{start:nextMonday(),pers:2,dej:"PAIN",entree:"47",vin:"50",sel:{1:[1,3],2:[1,3],3:[1,3],4:[1,3],5:[1,3],6:[1,3],7:[1,3]},chk:{},tab:"semaine",day:1};
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const label=refs=>refs.filter(r=>r!=="TISANE").map(r=>REC[r].name).join(", ");
 const iconsOf=refs=>[...new Set(refs.flatMap(r=>(RTXT[r]&&RTXT[r].ic)?[...RTXT[r].ic]:[]))].map(k=>ICONS[k]).join(" ");
 const menu=(d,c)=>DATA.menus.find(m=>m.d===d&&m.c===c).refs;
-const menuId=id=>{const [d,c]=id.split("-").map(Number);return menu(d,c)};
-const ALL=DATA.menus.map(m=>({id:`${m.d}-${m.c}`,d:m.d,c:m.c,refs:m.refs}));
 const fmt=q=>{const v=Math.ceil(q*10)/10;return (v%1?v.toFixed(1):String(v)).replace(".",",")};
 function dateOf(d){const x=new Date(S.start+"T12:00:00");x.setDate(x.getDate()+d-1);return x}
 function dayName(d){const x=dateOf(d);return DAYS[x.getDay()]+" "+x.getDate()}
@@ -155,7 +147,7 @@ function dayName(d){const x=dateOf(d);return DAYS[x.getDay()]+" "+x.getDate()}
 // ---- calculs ----
 function portionsFor(d){ // Map ref -> portions pour la journée d
   const p=new Map();const add=(r,n)=>p.set(r,(p.get(r)||0)+n);
-  for(const id of S.sel[d]){for(const r of menuId(id)){add(r,S.pers);if(VINSET.has(r))add(S.vin,S.pers)}}
+  for(const c of S.sel[d]){for(const r of menu(d,c)){add(r,S.pers);if(VINSET.has(r))add(S.vin,S.pers)}}
   add(S.entree,S.sel[d].length*S.pers);add("DEJ",S.pers);add(S.dej,S.pers);return p}
 function ingredients(pmap){ // agrège en {rayon:{ing:{q,u}}}
   const out={};
@@ -166,16 +158,15 @@ function weekPortions(){const p=new Map();for(let d=1;d<=7;d++)for(const [r,n] o
 // ---- rendu : semaine ----
 function renderWeek(){
   $("#start").value=S.start;$("#pVal").textContent=S.pers;$("#dej").value=S.dej;$("#entree").value=S.entree;$("#vin").value=S.vin;
-  const opts=v=>`<option value="">— aucun —</option>`+ALL.map(m=>`<option value="${m.id}"${m.id===v?" selected":""}>Jour ${m.d}, choix ${m.c} : ${esc(label(m.refs))}</option>`).join("");
   let h="";
-  for(let d=1;d<=7;d++){const s=S.sel[d];
-    h+=`<div class="day"><div class="daynum">${d}<small>${esc(dayName(d))}</small></div><div class="card" style="margin:0">`;
-    [["Midi",0],["Soir",1]].forEach(([k,i])=>{const v=s[i]||"";const m=ALL.find(x=>x.id===v);
-      h+=`<div class="slot"><div class="slotk">${k}</div><select data-d="${d}" data-i="${i}">${opts(v)}</select>${m?`<div class="slotv">${esc(label(m.refs))} <span class="icons">${iconsOf(m.refs)}</span></div>`:""}</div>`});
-    h+=`<div class="tools" style="margin:8px 0 0"><button class="btn small" data-copy="${d}">Copier à toute la semaine</button></div></div></div>`}
+  for(let d=1;d<=7;d++){
+    h+=`<div class="day"><div class="daynum">${d}<small>${esc(dayName(d))}</small></div><div>`;
+    for(let c=1;c<=3;c++){const refs=menu(d,c);const on=S.sel[d].includes(c);
+      h+=`<div class="choice${on?" on":""}" data-d="${d}" data-c="${c}"><div class="chk">${on?"✓":""}</div><div><div class="t"><b>Choix ${c}</b> — ${esc(label(refs))}</div><div class="icons">${iconsOf(refs)}</div></div></div>`}
+    if(S.sel[d].length>2)h+=`<div class="warn">Le programme demande 2 choix par jour.</div>`;
+    h+=`</div></div>`}
   $("#grid").innerHTML=h;
-  $("#grid").querySelectorAll("select").forEach(el=>el.onchange=()=>{const d=+el.dataset.d,i=+el.dataset.i;const a=S.sel[d];while(a.length<2)a.push("");a[i]=el.value;S.sel[d]=a.filter(x=>x)/*compacte*/;if(i===1&&a[0]===""&&el.value)S.sel[d]=[el.value];save();renderWeek()});
-  $("#grid").querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{const src=S.sel[+b.dataset.copy];for(let d=1;d<=7;d++)S.sel[d]=[...src];save();renderWeek()});
+  $("#grid").querySelectorAll(".choice").forEach(el=>el.onclick=()=>{const d=+el.dataset.d,c=+el.dataset.c;const a=S.sel[d];const i=a.indexOf(c);i>=0?a.splice(i,1):a.push(c);a.sort();save();renderWeek()});
 }
 // ---- rendu : recette ----
 function recipeHTML(ref,open){
@@ -197,13 +188,13 @@ function renderCal(){
   h+=`<div class="meal"><div class="k">Entrée (avant chaque repas)</div><div class="v">${esc(REC[S.entree].name)}</div>${recipeHTML(S.entree)}</div></div>`;
   const sel=S.sel[d];
   if(!sel.length)h+=`<div class="card empty">Aucun repas choisi pour ce jour. Sélectionne-les dans l'onglet Semaine.</div>`;
-  sel.forEach((id,idx)=>{const refs=menuId(id);const [jd,jc]=id.split("-");
-    h+=`<div class="card"><div class="meal"><div class="k">${idx===0?"Repas du midi":"Repas du soir"} — jour ${jd}, choix ${jc} du programme</div><div class="v">${refs.map(r=>esc(REC[r].name)).join("<br>")}</div>`;
+  sel.forEach((c,idx)=>{const refs=menu(d,c);
+    h+=`<div class="card"><div class="meal"><div class="k">${idx===0?"Repas du midi":"Repas du soir"} — choix ${c}</div><div class="v">${refs.map(r=>esc(REC[r].name)).join("<br>")}</div>`;
     h+=refs.filter(r=>RTXT[r]).map(r=>recipeHTML(r)).join("");
     if(refs.some(r=>VINSET.has(r)))h+=recipeHTML(S.vin);
     h+=`</div></div>`});
   // à préparer la veille pour le lendemain
-  if(d<7){const nxt=S.sel[d+1].flatMap(id=>menuId(id)).concat([S.entree,S.dej]);const tips=[...new Set(nxt.filter(r=>PREP[r]).map(r=>`<b>${esc(REC[r].name)}</b> — ${esc(PREP[r])}`))];
+  if(d<7){const nxt=S.sel[d+1].flatMap(c=>menu(d+1,c)).concat([S.entree,S.dej]);const tips=[...new Set(nxt.filter(r=>PREP[r]).map(r=>`<b>${esc(REC[r].name)}</b> — ${esc(PREP[r])}`))];
     if(tips.length)h+=`<h2>À préparer la veille pour le jour ${d+1}</h2><div class="prep">${tips.join("<br>")}</div>`}
   // ingrédients du jour
   const ing=ingredients(portionsFor(d));
