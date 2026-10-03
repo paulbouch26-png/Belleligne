@@ -93,7 +93,7 @@ input[type=number]{width:70px;text-align:center}
 .empty{color:var(--muted);font-size:14px;padding:10px 0}
 @media (prefers-reduced-motion:no-preference){.choice{transition:background .15s,border-color .15s}}
 
-nav button{font-size:10px}
+nav button{font-size:9.5px;padding:7px 0 5px}nav button span.ic{font-size:20px}
 .modeSw{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:8px}
 .modeSw button{flex:1;border:0;background:#fff;padding:7px;font:inherit;font-size:13px;color:var(--muted)}
 .modeSw button.on{background:var(--blue);color:#fff;font-weight:600}
@@ -133,6 +133,16 @@ nav button{font-size:10px}
 .ref td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
 .ref .rule{background:#eaf5f9;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px}
 .ref .rule b{color:var(--blue)}
+.ens{margin-bottom:10px}.ens summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
+.ens summary::-webkit-details-marker{display:none}.ens .en{font-weight:600;font-size:15px;color:var(--blue)}.ens .et{font-size:12px;color:var(--muted)}
+.ens .find{border:1px solid var(--teal);color:var(--teal);background:#fff;border-radius:8px;padding:5px 9px;font:inherit;font-size:13px;white-space:nowrap}
+.oi{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.oi .ot{flex:1}.oi .ot small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.oi .badge{flex:none;font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;color:#fff;background:var(--green)}
+.oi .badge.no{background:var(--brick)}.oi .badge.ok2{background:var(--teal)}
+.oi .addj{flex:none;border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 8px;font:inherit;font-size:12px;color:var(--blue)}
+.verdict{border-left:5px solid var(--green)}.verdict.no{border-left-color:var(--brick)}.verdict.maybe{border-left-color:#c58a00}
+.verdict img{max-width:100%;border-radius:8px;margin-bottom:8px}
 /* journal imprimable */
 .jwrap{overflow-x:auto}
 .jour{border-collapse:collapse;width:100%;min-width:720px;font-size:11px;background:#fff}
@@ -158,6 +168,7 @@ nav button{font-size:10px}
     <div class="row"><label>Petit déjeuner (jours programmés)</label><select id="dej"><option value="PAIN">Pain de grain entier</option><option value="54">Muffin aux fruits (54)</option></select></div>
     <div class="row"><label>Entrée (jours programmés)</label><select id="entree"><option value="47">Bouillon de légumes (47)</option><option value="40">Potage aux légumes verts (40)</option><option value="39">Soupe aux légumes (39)</option><option value="46">Soupe aux tomates (46)</option><option value="JUSLEG">Jus de légumes ou de tomate</option></select></div>
     <div class="row"><label>Vinaigrette</label><select id="vin"><option value="50">Vinaigrette (base) 50</option><option value="51">À l'ail 51</option><option value="52">Au yogourt 52</option><option value="53">Soleil 53</option></select></div>
+    <div class="row"><label>Clé API Anthropic (photo)</label><input type="password" id="apikey" placeholder="sk-ant-…" autocomplete="off" style="max-width:52%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px"></div>
     <div class="row"><label>Repas du groupe A visés / semaine</label><div class="stepper"><button id="aMinus">−</button><b id="aVal">4</b><button id="aPlus">+</button></div></div>
   </div>
   <div class="counters" id="wk"></div>
@@ -180,6 +191,16 @@ nav button{font-size:10px}
   <div id="recList"></div>
 </section>
 
+<section id="v-sortir" class="view">
+  <div class="card">
+    <div class="row"><label>Ville (vide = près de moi)</label><input type="text" id="ville" placeholder="Trois-Rivières" style="max-width:52%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px"></div>
+    <div class="row"><label>Analyser un repas en photo</label><label class="btn primary" style="cursor:pointer">📷 Photo<input type="file" id="photo" accept="image/*" capture="environment" style="display:none"></label></div>
+  </div>
+  <div id="photoOut"></div>
+  <p class="note">Touche 📍 pour ouvrir Plans avec l'enseigne dans la ville indiquée. Déplie une enseigne pour voir quoi commander selon l'ABC, puis « + Journal » pour l'inscrire à un repas.</p>
+  <div id="ens"></div>
+</section>
+
 <section id="v-journal" class="view">
   <div class="tools noprint"><button class="btn primary" id="print">Imprimer / PDF</button><button class="btn" id="shareJ">Partager en texte</button></div>
   <div id="journal"></div>
@@ -193,6 +214,7 @@ nav button{font-size:10px}
   <button data-v="epicerie"><span class="ic">🧺</span>Épicerie</button>
   <button data-v="recettes"><span class="ic">📖</span>Recettes</button>
   <button data-v="journal"><span class="ic">📝</span>Journal</button>
+  <button data-v="sortir"><span class="ic">🍴</span>Sortir</button>
 </nav>
 
 <div class="sheet" id="sheet"><div class="box">
@@ -227,13 +249,82 @@ const FOOD=Object.fromEntries(ABC.map(f=>[f.id,f]));
 for(const f of ABC)REC[f.id]={ref:f.id,name:f.n,port:1,ing:f.q?[{i:f.n.replace(/ \(.*\)$/,""),q:f.q,u:f.u,r:f.r}]:[]};
 // groupe des recettes du livre
 const RG={1:"C",2:"C",3:"B",4:"C",5:"C",6:"A",7:"B",8:"B",9:"B",10:"B",11:"B",12:"C",13:"B",14:"B",15:"C",16:"A",17:"A",18:"A",19:"A",20:"A",21:"B",22:"B",23:"B",24:"B",25:"B",26:"B",27:"B",28:"B",29:"B",30:"B",31:"B",32:"B",33:"B",34:"B",35:"B",36:"B",37:"B",38:"B",39:"C",40:"C",41:"B",42:"B",43:"B",44:"B",45:"B",46:"C",47:"C",48:"C",49:"B",50:"O",51:"O",52:"O",53:"O",54:"B",55:"B",56:"B",57:"C"};
+
+// ===== Enseignes : quoi commander selon l'ABC (A+C / B+C / jamais A+B) =====
+// g : combinaison résultante ; k : repas où ça convient ; n : note (quoi retirer / remplacer)
+const ENSEIGNES=[
+ {n:"Subway",q:"Subway",t:"Restaurant rapide",items:[
+  {t:"Salade poulet grillé (ou poitrine de dinde)",g:"A+C",k:"din,sou",n:"Sans fromage, sans croûtons. Vinaigrette huile et vinaigre ou citron."},
+  {t:"Salade poulet façon rôtisserie",g:"A+C",k:"din,sou",n:"Sans fromage ni sauces crémeuses."},
+  {t:"Salade Végé-délice + œuf",g:"B+C",k:"dej,din,sou",n:"Demander l'œuf du déjeuner ajouté à la salade. Sans fromage si on veut 1 seul B."},
+  {t:"Bol Énergie (sans riz)",g:"A+C",k:"din,sou",n:"Le riz = B : avec poulet ou steak, demander sans riz. Avec riz et sans viande = B+C."},
+  {t:"Sous-marin sur pain de blé entier",g:"A+B",k:"",n:"Pain (B) + viande (A) = interdit. Le prendre en salade."}]},
+ {n:"McDonald's",q:"McDonald's",t:"Restaurant rapide",items:[
+  {t:"Œuf du McMuffin (sans muffin) + pommes tranchées",g:"B+C",k:"dej",n:"Demander l'œuf seul. Le muffin et le fromage fondu : non."},
+  {t:"Poulet grillé seul + salade d'accompagnement",g:"A+C",k:"din,sou",n:"Poulet grillé offert dans certains restaurants seulement. Sans wrap (tortilla de farine blanche)."},
+  {t:"Pommes tranchées",g:"C",k:"am,pm,soir",n:"Collation fruit."},
+  {t:"Burgers, wraps, McCroquettes, frites",g:"Interdit",k:"",n:"Pain blanc, panure, friture. Rien de conforme."}]},
+ {n:"Tim Hortons",q:"Tim Hortons",t:"Restaurant rapide",items:[
+  {t:"Gruau (avoine) + fruit",g:"B+C",k:"dej",n:"Sans sucre ni garniture sucrée. Le fruit 2 h après si possible."},
+  {t:"Œufs (du sandwich-déjeuner) sans pain",g:"B",k:"dej",n:"Ajouter un fruit à part pour le C."},
+  {t:"Soupe aux lentilles ou aux légumes",g:"B+C",k:"din,sou",n:"Pas de pain, pas de biscuit."},
+  {t:"Salade poulet grillé",g:"A+C",k:"din,sou",n:"Si offerte. Sans fromage ni croûtons."},
+  {t:"Bagel, beigne, sandwichs sur pain blanc",g:"Interdit",k:"",n:"Pain blanc et sucre."}]},
+ {n:"A&W",q:"A&W",t:"Restaurant rapide",items:[
+  {t:"Poulet grillé sans pain + salade",g:"A+C",k:"din,sou",n:"Demander la galette de poulet grillé sans pain, avec laitue et tomate."},
+  {t:"Burger de bœuf sans pain + salade",g:"A+C",k:"din,sou",n:"Sans fromage, sans sauce. Bœuf = A."},
+  {t:"Œufs du déjeuner sans pain + fruit",g:"B+C",k:"dej",n:"Pas de bacon ni saucisse (charcuterie)."},
+  {t:"Pain, frites, oignons frits, root beer",g:"Interdit",k:"",n:""}]},
+ {n:"St-Hubert",q:"St-Hubert",t:"Rôtisserie",items:[
+  {t:"Poitrine de poulet sans peau + salade de chou ou salade verte",g:"A+C",k:"din,sou",n:"Remplacer les frites par salade ou légumes. Sauce St-Hubert : non (farine, sucre)."},
+  {t:"Salade repas au poulet",g:"A+C",k:"din,sou",n:"Sans croûtons ni fromage, vinaigrette à l'huile."},
+  {t:"Soupe aux légumes",g:"C",k:"din,sou",n:"Entrée conforme."},
+  {t:"Frites, pain, sauce, desserts",g:"Interdit",k:"",n:""}]},
+ {n:"Yuzu sushi",q:"Yuzu sushi",t:"Sushi",items:[
+  {t:"Sashimi + salade d'algues ou edamames",g:"A+C",k:"din,sou",n:"Edamames = légumineuses (B) : avec sashimi, préférer la salade d'algues ou le concombre."},
+  {t:"Poké sans riz (base laitue) saumon ou thon",g:"A+C",k:"din,sou",n:"Demander base laitue ou légumes. Sauces : citron, pas de mayo épicée."},
+  {t:"Bol tofu + légumes sur riz brun (si offert)",g:"B+C",k:"din,sou",n:"Riz blanc = interdit. Tofu + riz brun = 2 B max."},
+  {t:"Makis, sushis au riz blanc, tempura",g:"Interdit",k:"",n:"Riz blanc et friture. Riz + poisson = A+B de toute façon."}]},
+ {n:"Sushi Shop",q:"Sushi Shop",t:"Sushi",items:[
+  {t:"Sashimi + salade d'algues",g:"A+C",k:"din,sou",n:""},
+  {t:"Poké sur laitue (sans riz)",g:"A+C",k:"din,sou",n:"Sans mayo épicée, sans oignons frits."},
+  {t:"Makis et rouleaux au riz",g:"Interdit",k:"",n:""}]},
+ {n:"Thaï Express",q:"Thaï Express",t:"Asiatique",items:[
+  {t:"Poulet ou crevettes sautés aux légumes, sans riz ni nouilles",g:"A+C",k:"din,sou",n:"Demander « légumes seulement » comme base. Sauce légère (ail, basilic)."},
+  {t:"Tofu sauté aux légumes avec riz brun",g:"B+C",k:"din,sou",n:"Riz blanc = interdit ; si pas de riz brun, prendre sans riz."},
+  {t:"Pad thaï, nouilles, riz blanc",g:"Interdit",k:"",n:""}]},
+ {n:"IGA",q:"IGA",t:"Épicerie — prêt-à-manger",items:[
+  {t:"Poulet rôti (sans peau) + salade du comptoir",g:"A+C",k:"din,sou",n:"Salades sans pâtes, sans fromage, sans vinaigrette crémeuse."},
+  {t:"Saumon cuit + légumes grillés",g:"A+C",k:"din,sou",n:""},
+  {t:"Salade de légumineuses (lentilles, pois chiches)",g:"B+C",k:"din,sou",n:"Vérifier qu'il n'y a pas de pâtes ni de maïs."},
+  {t:"Yogourt grec nature + petits fruits",g:"B+C",k:"dej,am,pm",n:"Sans sucre ajouté."},
+  {t:"Œufs cuits durs + crudités",g:"B+C",k:"dej,am,pm,soir",n:""},
+  {t:"Fromage cottage + fruit",g:"B+C",k:"dej,am,pm",n:""}]},
+ {n:"Metro",q:"Metro",t:"Épicerie — prêt-à-manger",items:[
+  {t:"Poulet rôti + salade verte",g:"A+C",k:"din,sou",n:""},
+  {t:"Filet de poisson cuit + légumes vapeur",g:"A+C",k:"din,sou",n:""},
+  {t:"Soupe aux lentilles ou pois cassés",g:"B+C",k:"din,sou",n:"Sans pain."},
+  {t:"Yogourt grec, cottage, œufs durs, noix",g:"B",k:"dej,am,pm,soir",n:"Ajouter un fruit ou des crudités (C)."},
+  {t:"Crudités et fruits prêts à manger",g:"C",k:"am,pm,soir",n:""}]},
+ {n:"Maxi",q:"Maxi",t:"Épicerie — prêt-à-manger",items:[
+  {t:"Poulet rôti + salade",g:"A+C",k:"din,sou",n:""},
+  {t:"Salade de quinoa ou légumineuses",g:"B+C",k:"din,sou",n:"Sans maïs, sans fromage si 2 B déjà."},
+  {t:"Œufs durs, yogourt grec nature, noix",g:"B",k:"dej,am,pm,soir",n:"Avec fruit ou crudités."},
+  {t:"Plateau de crudités, fruits coupés",g:"C",k:"am,pm,soir",n:""}]},
+ {n:"Costco",q:"Costco",t:"Épicerie — prêt-à-manger",items:[
+  {t:"Poulet rôti + salade du comptoir",g:"A+C",k:"din,sou",n:"Les salades repas Costco contiennent souvent pâtes ou fromage : vérifier."},
+  {t:"Saumon ou crevettes cuites + légumes",g:"A+C",k:"din,sou",n:""},
+  {t:"Œufs durs, fromage cottage, yogourt grec",g:"B",k:"dej,am,pm",n:"Avec fruit (C)."},
+  {t:"Hot-dog, pizza, poutine du comptoir",g:"Interdit",k:"",n:""}]}
+];
+const XITEMS={};ENSEIGNES.forEach((e,i)=>e.items.forEach((it,j)=>{XITEMS[`X${i}-${j}`]={e,it,name:e.n+" — "+it.t}}));
 const INTERDITS=["Sucre blanc","Pain blanc","Riz blanc","Pâte blanche","Pomme de terre (sauf 1×/sem)","Maïs","Carotte cuite","Betteraves","Banane","Melon d'eau","Boisson gazeuse","Bière","Café fort","Charcuterie (bacon, saucisse, jambon)","Smoked meat","Crème de table"];
 const MEALS=[["dej","Déjeuner"],["am","Collation AM"],["din","Dîner"],["pm","Collation PM"],["sou","Souper"],["soir","Collation soir"]];
 const MAIN=new Set(["dej","din","sou"]);
 
 function nextMonday(){const d=new Date();d.setHours(12,0,0,0);const dow=d.getDay();d.setDate(d.getDate()-((dow+6)%7));return d.toISOString().slice(0,10)}
 let S=JSON.parse(localStorage.getItem(KEY)||"null")||{start:nextMonday(),pers:2,dej:"PAIN",entree:"47",vin:"50",sel:{1:["1-1","1-3"],2:["2-1","2-3"],3:["3-1","3-3"],4:["4-1","4-3"],5:["5-1","5-3"],6:["6-1","6-3"],7:["7-1","7-3"]},chk:{},tab:"semaine",day:1};
-S.prog=S.prog||{1:1,2:2,3:3,4:4,5:5,6:6,7:7};S.mode=S.mode||{};S.libre=S.libre||{};S.aTarget=S.aTarget||4;
+S.photos=S.photos||{};S.prog=S.prog||{1:1,2:2,3:3,4:4,5:5,6:6,7:7};S.mode=S.mode||{};S.libre=S.libre||{};S.aTarget=S.aTarget||4;
 for(const d in S.sel)S.sel[d]=S.sel[d].map(x=>typeof x==="number"?`${d}-${x}`:x);
 for(let d=1;d<=7;d++){S.mode[d]=S.mode[d]||"prog";S.libre[d]=S.libre[d]||{};for(const [k] of MEALS)S.libre[d][k]=S.libre[d][k]||[];S.libre[d].eaten=S.libre[d].eaten||{}}
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
@@ -249,11 +340,14 @@ function dateOf(d){const x=new Date(S.start+"T12:00:00");x.setDate(x.getDate()+d
 function dayName(d){const x=dateOf(d);return DAYS[x.getDay()]+" "+x.getDate()}
 function shortDate(d){const x=dateOf(d);return String(x.getDate()).padStart(2,"0")+"/"+String(x.getMonth()+1).padStart(2,"0")}
 // item (libre) -> {name, g, fruit}
-const itemOf=id=>id.startsWith("F")?{name:FOOD[id].n,g:FOOD[id].g,f:!!FOOD[id].f,w:!!FOOD[id].w}:{name:RTXT[id]?RTXT[id].t:REC[id].name,g:RG[+id]||"N",f:false,w:false};
+const itemOf=id=>{if(id.startsWith("X")){const x=XITEMS[id];const gl=x.it.g==="Interdit"?["I"]:x.it.g.split("+");return{name:x.name,g:gl[0],gl,f:false,w:false}}
+  if(id.startsWith("P")){const x=S.photos[id]||{name:"Photo",g:"N"};const gl=x.g==="Interdit"?["I"]:x.g.split("+");return{name:x.name,g:gl[0],gl,f:false,w:false}}
+  if(id.startsWith("F"))return{name:FOOD[id].n,g:FOOD[id].g,gl:[FOOD[id].g],f:!!FOOD[id].f,w:!!FOOD[id].w};
+  const g=RG[+id]||"N";return{name:RTXT[id]?RTXT[id].t:REC[id].name,g,gl:[g],f:false,w:false}};
 
 // ===== validation libre choix =====
 function checkMeal(k,ids){
-  const it=ids.map(itemOf);const gs=it.map(x=>x.g);const nA=gs.filter(g=>g==="A").length,nB=gs.filter(g=>g==="B").length,nC=gs.filter(g=>g==="C").length;
+  const it=ids.map(itemOf);const gs=it.flatMap(x=>x.gl);if(gs.includes("I"))return["contient un interdit"];const nA=gs.filter(g=>g==="A").length,nB=gs.filter(g=>g==="B").length,nC=gs.filter(g=>g==="C").length;
   const e=[];
   if(nA&&nB)e.push("A + B interdit");
   if(nB>2)e.push("maximum 2 B");
@@ -261,7 +355,7 @@ function checkMeal(k,ids){
   if(k==="din"||k==="sou"){if(ids.length&&!nA&&!nB)e.push("il manque A ou B");if(ids.length&&!nC)e.push("il manque le C")}
   if(it.filter(x=>x.f).length>1&&MAIN.has(k))e.push("1 fruit à la fois, 2 h après le repas");
   return e}
-function dayStats(d){const L=S.libre[d];let fruits=0,A=0;for(const [k] of MEALS){const it=L[k].map(itemOf);fruits+=it.filter(x=>x.f).length;if((k==="din"||k==="sou")&&it.some(x=>x.g==="A"))A++}return{fruits,A}}
+function dayStats(d){const L=S.libre[d];let fruits=0,A=0;for(const [k] of MEALS){const it=L[k].map(itemOf);fruits+=it.filter(x=>x.f).length;if((k==="din"||k==="sou")&&it.some(x=>x.gl.includes("A")))A++}return{fruits,A}}
 function weekStats(){let A=0,pdt=0,libre=0;for(let d=1;d<=7;d++){if(S.mode[d]!=="libre")continue;libre++;A+=dayStats(d).A;for(const [k] of MEALS)pdt+=S.libre[d][k].filter(id=>itemOf(id).w).length}return{A,pdt,libre}}
 
 // ===== calculs épicerie =====
@@ -292,13 +386,13 @@ function renderSheet(){
   $("#shBody").innerHTML=h;
   $("#shBody").querySelectorAll(".pill").forEach(p=>p.onclick=()=>{const a=S.libre[SH.d][SH.k];const i=a.indexOf(p.dataset.id);i>=0?a.splice(i,1):a.push(p.dataset.id);save();p.classList.toggle("sel")});
 }
-$("#shOk").onclick=()=>{$("#sheet").classList.remove("on");renderWeek()};
+$("#shOk").onclick=shOkDefault;
 $("#sheet").onclick=e=>{if(e.target.id==="sheet"){$("#sheet").classList.remove("on");renderWeek()}};
 
 // ===== rendu : semaine =====
 function mealPills(d,k){const ids=S.libre[d][k];return `<div class="pills">${ids.map(id=>{const it=itemOf(id);return`<span class="pill g${it.g}" data-rm="${id}" data-d="${d}" data-k="${k}">${esc(it.name)}<span class="x">×</span></span>`}).join("")}<span class="pill add" data-add="${k}" data-d="${d}">+ ajouter</span></div>`}
 function renderWeek(){
-  $("#start").value=S.start;$("#pVal").textContent=S.pers;$("#dej").value=S.dej;$("#entree").value=S.entree;$("#vin").value=S.vin;$("#aVal").textContent=S.aTarget;
+  $("#start").value=S.start;$("#pVal").textContent=S.pers;$("#dej").value=S.dej;$("#entree").value=S.entree;$("#vin").value=S.vin;$("#aVal").textContent=S.aTarget;$("#apikey").value=localStorage.getItem("belleligne.apikey")||"";
   const w=weekStats();
   $("#wk").innerHTML=w.libre?`<span class="${w.A>S.aTarget?"bad":""}">Repas A : ${w.A} / ${S.aTarget}</span><span class="${w.pdt>1?"bad":""}">Pomme de terre : ${w.pdt} / 1</span><span>${w.libre} jour${w.libre>1?"s":""} en libre choix</span>`:"";
   let h="";
@@ -412,9 +506,57 @@ function renderJournal(){
   <div class="rule"><b>Déjeuner :</b> 1 B + C<br><b>Dîner et souper :</b> A + C (le nombre de repas A dépend du métabolisme : ${S.aTarget}/sem) ou 1 à 2 B + C<br><b>Jamais :</b> A + B</div>
   <ul style="font-size:13px;padding-left:18px;margin:0"><li>Les quantités ou calories sont sans importance.</li><li>Les fruits se mangent 2 heures après les repas ou 1 heure avant (maximum 3 fruits par jour).</li><li>Pas d'alcool, sauf vin de préférence rouge, à la fin du repas plutôt qu'au début.</li><li>Pour la cuisson ou les vinaigrettes, utiliser l'huile d'olive extra-vierge.</li><li>Privilégier la cuisson à la vapeur.</li><li>Comme assaisonnement, utiliser du sel végétal (Herbamare) ou du poivre de cayenne.</li></ul>`;
 }
+
+// ===== Sortir =====
+const KAPI="belleligne.apikey";
+function mapsUrl(q){const v=($("#ville").value||"").trim();const s=encodeURIComponent(v?`${q} ${v}`:q);return v?`https://maps.apple.com/?q=${s}`:`https://maps.apple.com/?q=${s}&sll=`}
+function renderSortir(){
+  $("#ville").value=S.ville||"";$("#apikey").value=localStorage.getItem(KAPI)||"";
+  $("#ens").innerHTML=ENSEIGNES.map((e,i)=>`<details class="card ens"><summary><span><span class="en">${esc(e.n)}</span><br><span class="et">${esc(e.t)} · ${e.items.filter(x=>x.g!=="Interdit"&&x.g!=="A+B").length} options conformes</span></span><a class="find" href="${mapsUrl(e.q)}" target="_blank" rel="noopener">📍 Trouver</a></summary>
+    ${e.items.map((it,j)=>{const bad=it.g==="Interdit"||it.g==="A+B";return`<div class="oi"><span class="badge${bad?" no":it.g.includes("A")?"":" ok2"}">${esc(it.g)}</span><div class="ot">${esc(it.t)}${it.n?`<small>${esc(it.n)}</small>`:""}</div>${bad?"":`<button class="addj" data-x="X${i}-${j}">+ Journal</button>`}</div>`}).join("")}</details>`).join("");
+  $("#ens").querySelectorAll(".addj").forEach(b=>b.onclick=()=>pickSlot(b.dataset.x));
+  $("#ens").querySelectorAll(".find").forEach(a=>a.onclick=()=>{a.href=mapsUrl(a.closest("details").querySelector(".en").textContent)});
+}
+$("#ville").onchange=e=>{S.ville=e.target.value.trim();save();renderSortir()};
+$("#apikey").onchange=e=>localStorage.setItem(KAPI,e.target.value.trim());
+// choisir date + repas pour un item externe (X… ou P…)
+function pickSlot(id){
+  const it=itemOf(id);const kinds=id.startsWith("X")?XITEMS[id].it.k.split(",").filter(x=>x):["dej","din","sou","am","pm","soir"];
+  $("#shTitle").textContent="Inscrire : "+it.name;$("#shTabs").innerHTML="";
+  let h=`<h5>Quel jour ?</h5><div class="pills">${[1,2,3,4,5,6,7].map(d=>`<span class="pill${d===S.day?" sel":""}" data-pd="${d}">${esc(dayName(d))}</span>`).join("")}</div><h5>Quel repas ?</h5><div class="pills">${MEALS.filter(([k])=>kinds.includes(k)).map(([k,t],i)=>`<span class="pill${i===0?" sel":""}" data-pk="${k}">${t}</span>`).join("")}</div><p class="note">Le jour passera en mode « libre choix » s'il est programmé.</p>`;
+  $("#shBody").innerHTML=h;
+  const b=$("#shBody");b.querySelectorAll("[data-pd]").forEach(p=>p.onclick=()=>{b.querySelectorAll("[data-pd]").forEach(x=>x.classList.remove("sel"));p.classList.add("sel")});
+  b.querySelectorAll("[data-pk]").forEach(p=>p.onclick=()=>{b.querySelectorAll("[data-pk]").forEach(x=>x.classList.remove("sel"));p.classList.add("sel")});
+  $("#shOk").onclick=()=>{const d=+b.querySelector("[data-pd].sel").dataset.pd;const k=b.querySelector("[data-pk].sel").dataset.pk;S.mode[d]="libre";if(!S.libre[d][k].includes(id))S.libre[d][k].push(id);S.day=d;save();$("#sheet").classList.remove("on");$("#shOk").onclick=shOkDefault;show("cal")};
+  $("#sheet").classList.add("on")}
+function shOkDefault(){$("#sheet").classList.remove("on");renderWeek()}
+// ===== Photo -> verdict (API Anthropic, clé locale) =====
+const ABC_PROMPT=`Tu es l'assistant du programme alimentaire BelleLigne (métabolisme mixte). Classe les aliments visibles sur la photo selon l'ABC :
+A = viandes (bœuf, veau, agneau, poulet, dinde, lapin), poisson, fruits de mer.
+B = œuf, lait écrémé, fromage léger, yogourt sans gras sans sucre, noix/amandes/arachides, légumineuses, pain de grain entier, pâtes alimentaires, riz brun ou basmati, céréales à grains entiers, tofu, muffin de blé, pomme de terre (1 fois/semaine).
+C = fruits (sauf banane et melon d'eau) et légumes (sauf betterave et carotte cuite).
+Occasionnel = beurre d'arachide ou d'amande naturel, beurre/margarine non hydrogénée, mayonnaise légère, confiture non sucrée, vin rouge.
+Interdits = sucre blanc, pain blanc, riz blanc, pâtes blanches, maïs, carotte cuite, betterave, banane, melon d'eau, boissons gazeuses, bière, café fort, charcuteries (bacon, saucisse, jambon), smoked meat, crème de table, fritures.
+Règles : déjeuner = 1 B + C ; dîner et souper = A + C, ou 1 à 2 B + C ; JAMAIS A + B dans le même repas ; maximum 2 B ; fruits 2 h après le repas.
+Réponds UNIQUEMENT en JSON, sans texte autour : {"aliments":[{"nom":"…","groupe":"A|B|C|O|Interdit|N"}],"combinaison":"ex. A+C","verdict":"conforme|non conforme|incertain","explication":"une ou deux phrases","correction":"ce qu'il faut retirer ou remplacer pour que ce soit conforme, ou vide","resume":"nom court du plat (max 5 mots)"}`;
+function resizeImg(file){return new Promise(res=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{const m=1024;const s=Math.min(1,m/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL("image/jpeg",0.8))};img.src=u})}
+$("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value="";
+  const key=localStorage.getItem(KAPI);const out=$("#photoOut");
+  if(!key){out.innerHTML=`<div class="card verdict no">Entre d'abord ta clé API Anthropic dans l'onglet Semaine (réglages).</div>`;return}
+  out.innerHTML=`<div class="card">Analyse en cours…</div>`;
+  try{const data=await resizeImg(f);const b64=data.split(",")[1];
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:S.model||"claude-sonnet-4-6",max_tokens:600,system:ABC_PROMPT,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64}},{type:"text",text:"Analyse ce repas."}]}]})});
+    if(!r.ok){const er=await r.text();throw new Error(r.status+" "+er.slice(0,200))}
+    const j=await r.json();const txt=j.content.filter(c=>c.type==="text").map(c=>c.text).join("");const v=JSON.parse(txt.replace(/```json|```/g,"").trim());
+    const cls=v.verdict==="conforme"?"":v.verdict==="incertain"?" maybe":" no";const g=v.aliments.some(a=>a.groupe==="Interdit")?"Interdit":v.combinaison||"N";
+    const pid="P"+Date.now();S.photos[pid]={name:v.resume||"Repas en photo",g};save();
+    out.innerHTML=`<div class="card verdict${cls}"><img src="${data}" alt=""><b style="font-size:16px">${esc(v.verdict.toUpperCase())}</b> — ${esc(v.combinaison||"")}<div class="pills" style="margin:8px 0">${v.aliments.map(a=>`<span class="pill g${a.groupe==="Interdit"?"A":a.groupe}">${esc(a.nom)} <b>${esc(a.groupe)}</b></span>`).join("")}</div><div style="font-size:14px">${esc(v.explication||"")}</div>${v.correction?`<div class="prep" style="margin-top:8px"><b>Correction :</b> ${esc(v.correction)}</div>`:""}<div class="tools" style="margin:10px 0 0"><button class="btn primary" id="addP">+ Inscrire au journal</button></div></div>`;
+    $("#addP").onclick=()=>pickSlot(pid);
+  }catch(err){out.innerHTML=`<div class="card verdict no">Échec de l'analyse : ${esc(err.message)}</div>`}};
 // ===== navigation =====
-const VIEWS={semaine:renderWeek,cal:renderCal,epicerie:renderGro,recettes:renderRec,journal:renderJournal};
-const SUBS={semaine:"Sélection de la semaine",cal:"Repas et recettes du jour",epicerie:"Liste d'épicerie de la semaine",recettes:"Vos recettes du succès — 57 recettes",journal:"Journal de la semaine et ABC"};
+const VIEWS={semaine:renderWeek,cal:renderCal,epicerie:renderGro,recettes:renderRec,journal:renderJournal,sortir:renderSortir};
+const SUBS={semaine:"Sélection de la semaine",cal:"Repas et recettes du jour",epicerie:"Liste d'épicerie de la semaine",recettes:"Vos recettes du succès — 57 recettes",journal:"Journal de la semaine et ABC",sortir:"Restaurants et épiceries — quoi commander"};
 function show(v){if(!VIEWS[v])v="semaine";S.tab=v;save();document.querySelectorAll(".view").forEach(e=>e.classList.toggle("on",e.id==="v-"+v));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));VIEWS[v]();$("#hSub").textContent=SUBS[v];window.scrollTo(0,0)}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.v));
 $("#start").onchange=e=>{S.start=e.target.value;save();renderWeek()};
