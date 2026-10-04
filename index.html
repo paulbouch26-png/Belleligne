@@ -168,7 +168,8 @@ nav button{font-size:9.5px;padding:7px 0 5px}nav button span.ic{font-size:20px}
     <div class="row"><label>Petit déjeuner (jours programmés)</label><select id="dej"><option value="PAIN">Pain de grain entier</option><option value="54">Muffin aux fruits (54)</option></select></div>
     <div class="row"><label>Entrée (jours programmés)</label><select id="entree"><option value="47">Bouillon de légumes (47)</option><option value="40">Potage aux légumes verts (40)</option><option value="39">Soupe aux légumes (39)</option><option value="46">Soupe aux tomates (46)</option><option value="JUSLEG">Jus de légumes ou de tomate</option></select></div>
     <div class="row"><label>Vinaigrette</label><select id="vin"><option value="50">Vinaigrette (base) 50</option><option value="51">À l'ail 51</option><option value="52">Au yogourt 52</option><option value="53">Soleil 53</option></select></div>
-    <div class="row"><label>Clé API Anthropic (photo)</label><input type="password" id="apikey" placeholder="sk-ant-…" autocomplete="off" style="max-width:52%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px"></div>
+    <div class="row"><label>Clé API Anthropic (photo)</label><input type="password" id="apikey" placeholder="sk-ant-…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="max-width:52%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px"></div>
+    <div class="note" id="keyinfo" style="padding:0 0 8px"></div>
     <div class="row"><label>Repas du groupe A visés / semaine</label><div class="stepper"><button id="aMinus">−</button><b id="aVal">4</b><button id="aPlus">+</button></div></div>
   </div>
   <div class="counters" id="wk"></div>
@@ -392,7 +393,7 @@ $("#sheet").onclick=e=>{if(e.target.id==="sheet"){$("#sheet").classList.remove("
 // ===== rendu : semaine =====
 function mealPills(d,k){const ids=S.libre[d][k];return `<div class="pills">${ids.map(id=>{const it=itemOf(id);return`<span class="pill g${it.g}" data-rm="${id}" data-d="${d}" data-k="${k}">${esc(it.name)}<span class="x">×</span></span>`}).join("")}<span class="pill add" data-add="${k}" data-d="${d}">+ ajouter</span></div>`}
 function renderWeek(){
-  $("#start").value=S.start;$("#pVal").textContent=S.pers;$("#dej").value=S.dej;$("#entree").value=S.entree;$("#vin").value=S.vin;$("#aVal").textContent=S.aTarget;$("#apikey").value=localStorage.getItem("belleligne.apikey")||"";
+  $("#start").value=S.start;$("#pVal").textContent=S.pers;$("#dej").value=S.dej;$("#entree").value=S.entree;$("#vin").value=S.vin;$("#aVal").textContent=S.aTarget;$("#apikey").value=localStorage.getItem("belleligne.apikey")||"";keyInfo();
   const w=weekStats();
   $("#wk").innerHTML=w.libre?`<span class="${w.A>S.aTarget?"bad":""}">Repas A : ${w.A} / ${S.aTarget}</span><span class="${w.pdt>1?"bad":""}">Pomme de terre : ${w.pdt} / 1</span><span>${w.libre} jour${w.libre>1?"s":""} en libre choix</span>`:"";
   let h="";
@@ -518,7 +519,11 @@ function renderSortir(){
   $("#ens").querySelectorAll(".find").forEach(a=>a.onclick=()=>{a.href=mapsUrl(a.closest("details").querySelector(".en").textContent)});
 }
 $("#ville").onchange=e=>{S.ville=e.target.value.trim();save();renderSortir()};
-$("#apikey").onchange=e=>localStorage.setItem(KAPI,e.target.value.trim());
+const cleanKey=s=>s.replace(/[\u2010-\u2015\u2212]/g,"-").replace(/[^A-Za-z0-9_\-]/g,"");
+function keyInfo(){const k=localStorage.getItem(KAPI)||"";const el=$("#keyinfo");if(!el)return;
+  el.innerHTML=!k?"Aucune clé enregistrée.":(k.startsWith("sk-ant-")?"✓ ":"⚠ ne commence pas par sk-ant- · ")+esc(k.slice(0,14))+"…"+esc(k.slice(-4))+" ("+k.length+" caractères)";}
+function storeKey(v){const k=cleanKey(v);localStorage.setItem(KAPI,k);$("#apikey").value=k;keyInfo()}
+$("#apikey").onchange=e=>storeKey(e.target.value);$("#apikey").oninput=e=>storeKey(e.target.value);
 // choisir date + repas pour un item externe (X… ou P…)
 function pickSlot(id){
   const it=itemOf(id);const kinds=id.startsWith("X")?XITEMS[id].it.k.split(",").filter(x=>x):["dej","din","sou","am","pm","soir"];
@@ -547,7 +552,7 @@ $("#photo").onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.v
   try{const data=await resizeImg(f);const b64=data.split(",")[1];
     const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
       body:JSON.stringify({model:S.model||"claude-sonnet-4-6",max_tokens:600,system:ABC_PROMPT,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64}},{type:"text",text:"Analyse ce repas."}]}]})});
-    if(!r.ok){const er=await r.text();throw new Error(r.status+" "+er.slice(0,200))}
+    if(!r.ok){const er=await r.text();if(r.status===401)throw new Error("clé API refusée (401). Recolle la clé complète dans Semaine → Clé API, ou vérifie qu'elle est active dans console.anthropic.com.");if(r.status===400&&/credit/i.test(er))throw new Error("crédit insuffisant sur le compte Anthropic (Facturation).");throw new Error(r.status+" "+er.slice(0,200))}
     const j=await r.json();const txt=j.content.filter(c=>c.type==="text").map(c=>c.text).join("");const v=JSON.parse(txt.replace(/```json|```/g,"").trim());
     const cls=v.verdict==="conforme"?"":v.verdict==="incertain"?" maybe":" no";const g=v.aliments.some(a=>a.groupe==="Interdit")?"Interdit":v.combinaison||"N";
     const pid="P"+Date.now();S.photos[pid]={name:v.resume||"Repas en photo",g};save();
